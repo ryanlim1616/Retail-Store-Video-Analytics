@@ -28,7 +28,6 @@ stringLabel=[]
 path = 'config.txt'
 data = {}
 data['savedPoints'] = []
-revPoint = []
 
 def mouse_click():
     if(cvui.mouse(cvui.LEFT_BUTTON, cvui.CLICK)):
