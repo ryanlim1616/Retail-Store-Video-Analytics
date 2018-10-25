@@ -1,6 +1,7 @@
 import numpy as np
 import cv2
 import cvui
+import json
 
 
 WINDOW_NAME	= 'GUI'
@@ -20,6 +21,15 @@ layout_space_video = 10
 draw_line_width = 2
 draw_points_width = 4
 
+#define labels
+stringLabel=[]
+
+#path to output file
+path = 'config.txt'
+data = {}
+data['savedPoints'] = []
+revPoint = []
+
 def mouse_click():
     if(cvui.mouse(cvui.LEFT_BUTTON, cvui.CLICK)):
         if(cvui.mouse().x >= layout_space_video and cvui.mouse().x <= layout_space_video + video_size_x and cvui.mouse().y >= layout_space_video and cvui.mouse().y <= layout_space_video + video_size_y):
@@ -31,20 +41,43 @@ def mouse_click():
             print("Deleting points")
             del points[-1]
             fill_poligon = False
+            stringLabel.clear()
+            # erase stringLabel
+
+
+#check if config file is empty, if not refill the zones.
+with open('config.txt', 'r') as cfgfile:
+    cfgfile.seek(0) #start of file
+    first_char = cfgfile.read(1) #get the first character
+    if not first_char:
+         print ("Empty File") #first character is the empty string..
+    else:
+        cfgfile.seek(0) #first character wasn't empty, return to start of file.
+        # refill the zones
+        data = json.load(cfgfile)
+        for p in data['savedPoints']:
+            stringLabel = p['label']
+            for point in p['points']:
+                points.append((point[0],point[1]))
+
+
 
 while (True):
-    
+
     frame[:] = (49, 52, 49)
     ret, v_frame = cap.read()
-   
+
     mouse_click()
-        
+
     if(len(points) > 1):
         for i in range (len(points) - 1):
             cv2.line(v_frame, points[i], points[i + 1], (0,255,0), draw_line_width)
-        
+
         if(fill_poligon):
             cv2.line(v_frame, points[0], points[len(points) - 1], (0,255,0), draw_line_width)
+
+        #draw stringlabel at the last point
+        cv2.putText(v_frame, ''.join(stringLabel), points[-1], cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 255, 0))
 
     for point in points:
         cv2.circle(v_frame, tuple(point), draw_points_width, (0,0,255))
@@ -52,16 +85,28 @@ while (True):
     if(len(points) > 2):
         fill_poligon = True
 
-    if cvui.button(frame, layout_space_video + video_size_x + 30, 10, 'Done'):
+    if cvui.button(frame, layout_space_video + video_size_x + 30, 10, 'Save'):
         if(len(points) > 2):
             cv2.fillPoly(v_frame, np.array([points]), (255, 255, 255))
+        data['savedPoints'].append({
+            'label': ''.join(stringLabel),
+            'points': points
+            })
+        with open('config.txt', 'w') as outfile:
+            json.dump(data, outfile)
 
-        
+
+
 
     cvui.image(frame, 10, 10, v_frame)
     cvui.update()
 
     cv2.imshow(WINDOW_NAME, frame)
 
-    if cv2.waitKey(20) == 27:
+    key = cv2.waitKey(20)
+
+
+    if key == 27:
         break
+    elif key != -1:
+        stringLabel.append(chr(key))
