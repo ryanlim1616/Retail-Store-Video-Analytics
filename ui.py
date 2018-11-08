@@ -11,7 +11,7 @@ cvui.init(WINDOW_NAME)
 
 
 #cap = cv2.imread('test2.jpg')
-cap = cv2.VideoCapture('test.mp4')
+cap = cv2.VideoCapture('')
 
 current = (0, 0)
 points = []
