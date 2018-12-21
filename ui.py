@@ -11,7 +11,7 @@ cvui.init(WINDOW_NAME)
 
 
 #cap = cv2.imread('test2.jpg')
-cap = cv2.VideoCapture('')
+cap = cv2.VideoCapture('test.mp4')
 
 current = (0, 0)
 points = []
@@ -74,7 +74,7 @@ with open('config.txt', 'r') as cfgfile:
             stringLabel = p['label']
             #print(stringLabel)
             for point in p['points']:
-                points.append((point[0],point[1]))
+                points.append((int(point[0]*video_size_x),int(point[1]*video_size_y)))
 
 
 
@@ -93,7 +93,7 @@ while (True):
             stringLabel = p['label']
             points = []
             for point in p['points']:
-                points.append((point[0],point[1]))
+                points.append((int(point[0]*video_size_x),int(point[1]*video_size_y)))
 
                 if(len(points) > 1):
                     for i in range (len(points) - 1):
@@ -142,10 +142,15 @@ while (True):
         if(len(new_points) > 2):
             cv2.fillPoly(v_frame, np.array([new_points]), (255, 255, 255))
 
+        conv_points = []
+
+        for point in new_points:
+            conv_points.append((point[0]/video_size_x, point[1]/video_size_y))
+
         if(''.join(new_stringLabel) != '' or len(new_points) != 0):
             data['savedPoints'].append({
                 'label': ''.join(new_stringLabel),
-                'points': new_points
+                'points': conv_points
                 })
             objects = [new_stringLabel, new_points]
             savedPointsCol.append(objects)
@@ -158,7 +163,7 @@ while (True):
             for savedPoints in savedPointsCol:
                 #print(len(savedPoints[1]) - 1)
                 for i in range (len(savedPoints[1]) - 1):
-                    cv2.line(v_frame, savedPoints[1][i], savedPoints[1][i + 1], (0,255,0), draw_line_width)
+                    cv2.line(v_frame, (savedPoints[1][i][0]*video_size_x, savedPoints[1][i][1]*video_size_y), (savedPoints[1][i + 1][0]*video_size_x, savedPoints[1][i +1][1]*video_size_y), (0,255,0), draw_line_width)
 
 
             #save data into config file
