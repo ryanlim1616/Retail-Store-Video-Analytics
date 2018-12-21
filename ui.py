@@ -14,8 +14,14 @@ cvui.init(WINDOW_NAME)
 cap = cv2.VideoCapture('test.mp4')
 
 current = (0, 0)
+#zone:
 points = []
 new_points = []
+
+#entry/exit:
+epoints = []
+new_epoints = []
+
 fill_poligon = False
 
 #parameters
@@ -24,6 +30,12 @@ video_size_y = 480
 layout_space_video = 10
 draw_line_width = 2
 draw_points_width = 4
+
+
+
+#init variable
+setZone = 0
+setEntryExit = 0
 
 #define labels
 stringLabel=[]
@@ -59,6 +71,30 @@ def mouse_click():
                 new_stringLabel.clear()
 
 
+def mouse_click_entryexit():
+    if(cvui.mouse(cvui.LEFT_BUTTON, cvui.CLICK)):
+        if(cvui.mouse().x >= layout_space_video and cvui.mouse().x <= layout_space_video + video_size_x and cvui.mouse().y >= layout_space_video and cvui.mouse().y <= layout_space_video + video_size_y):
+            print("Adding entry/exit points ", (cvui.mouse().x - layout_space_video, cvui.mouse().y - layout_space_video))
+            new_epoints.append((cvui.mouse().x - layout_space_video, cvui.mouse().y - layout_space_video))
+
+    if(cvui.mouse(cvui.RIGHT_BUTTON, cvui.CLICK)):
+        if(cvui.mouse().x >= layout_space_video and cvui.mouse().x <= layout_space_video + video_size_x and cvui.mouse().y >= layout_space_video and cvui.mouse().y <= layout_space_video + video_size_y and len(epoints) > 0):
+            if(len(new_epoints) >= 1):
+                print("Deleting entry/exit points")
+                del new_epoints[-1]
+                fill_poligon = False
+            if(new_estringLabel):
+                # erase stringLabel
+                new_estringLabel.clear()
+
+    #if(len(new_epoints)>2):
+        #set direction
+        #draw arrow
+
+    #elif(len(new_epoints)>4):
+    if(len(new_epoints)>4):
+        setEntryExit = 0
+
 
 #check if config file is empty, if not refill the zones.
 with open('config.txt', 'r') as cfgfile:
@@ -85,7 +121,12 @@ while (True):
     ret, v_frame = cap.read()
     #v_frame = cap
 
-    mouse_click()
+    if setZone:
+        mouse_click()
+
+    if setEntryExit:
+        mouse_click_entryexit()
+
 
     #for existing points
     if(data):
@@ -132,13 +173,42 @@ while (True):
 
 
 
+    #for new epoints
+    if(len(new_epoints) >= 2):
+        cv2.rectangle(v_frame, new_epoints[0], new_epoints[1], (0,0,255), draw_line_width)
+        #draw stringlabel at the last point
+        #cv2.putText(v_frame, ''.join(new_estringLabel), new_epoints[1], cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 255, 0))
+
+
+    if(len(new_epoints) > 4):
+        cv2.line(v_frame, new_epoints[2], new_epoints[3], (0,0,255), draw_line_width)
+        #draw stringlabel at the last point
+        cv2.putText(v_frame, '*', new_epoints[3], cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 255, 0))
+
+
+    if(len(new_epoints) > 2):
+        fill_poligon = True
+
+
+    # define button functions:
     if cvui.button(frame, layout_space_video + video_size_x + 30, 50, 'Clear All'):
         data = {}
         data['savedPoints'] = []
+        setZone = 0
+        setEntryExit = 0
 
+    if cvui.button(frame, layout_space_video + video_size_x + 30, 90, 'Set Zone'):
+        setZone = 1
+        setEntryExit = 0
+
+    if cvui.button(frame, layout_space_video + video_size_x + 30, 130, 'Set Entry/Exit'):
+        setZone = 0
+        setEntryExit = 1
 
 
     if cvui.button(frame, layout_space_video + video_size_x + 30, 10, 'Save'):
+        setZone = 0
+        setEntryExit = 0
         if(len(new_points) > 2):
             cv2.fillPoly(v_frame, np.array([new_points]), (255, 255, 255))
 
