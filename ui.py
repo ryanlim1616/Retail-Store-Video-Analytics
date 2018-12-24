@@ -50,7 +50,7 @@ objects = []
 path = 'config.txt'
 data = {}
 data['savedPoints'] = []
-
+triggerSave = 0
 
 
 
@@ -147,11 +147,50 @@ while (True):
                     fill_poligon = True
 
 
-            if(fill_poligon):
+            if(fill_poligon and len(points) != 0):
                 cv2.line(v_frame, points[0], points[len(points) - 1], (0,255,0), draw_line_width)
 
-            #draw stringlabel at the last point
-            cv2.putText(v_frame, ''.join(stringLabel), points[-1], cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 255, 0))
+                #draw stringlabel at the last point
+                cv2.putText(v_frame, ''.join(stringLabel), points[-1], cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 255, 0))
+
+            epoints = []
+            for epoint in p['epoints']:
+                epoints.append((int(epoint[0]*video_size_x),int(epoint[1]*video_size_y)))
+
+            if(len(epoints)>=2):
+                cv2.rectangle(v_frame, epoints[0], epoints[1], (0,0,255), draw_line_width)
+
+
+            if(len(epoints) >= 4):
+                cv2.line(v_frame, epoints[2], epoints[3], (0,0,255), draw_line_width)
+                p = epoints[2]
+                q = epoints[3]
+
+                color = (0,0,255)
+                thickness = draw_line_width
+                line_type = 8
+                shift = 0
+                arrow_magnitude = 9
+                image = v_frame
+
+                # draw arrow tail
+                cv2.line(v_frame, p, q, color, thickness, line_type, shift)
+                # calc angle of the arrow
+                angle = np.arctan2(p[1]-q[1], p[0]-q[0])
+                # starting point of first line of arrow head
+                p = (int(q[0] + arrow_magnitude * np.cos(angle + np.pi/4)),
+                int(q[1] + arrow_magnitude * np.sin(angle + np.pi/4)))
+                # draw first half of arrow head
+                cv2.line(image, p, q, color, thickness, line_type, shift)
+                # starting point of second line of arrow head
+                p = (int(q[0] + arrow_magnitude * np.cos(angle - np.pi/4)),
+                int(q[1] + arrow_magnitude * np.sin(angle - np.pi/4)))
+                # draw second half of arrow head
+                cv2.line(image, p, q, color, thickness, line_type, shift)
+
+
+            if(len(epoints) > 2):
+                fill_poligon = True
 
 
     #for new points
@@ -180,10 +219,32 @@ while (True):
         #cv2.putText(v_frame, ''.join(new_estringLabel), new_epoints[1], cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 255, 0))
 
 
-    if(len(new_epoints) > 4):
+    if(len(new_epoints) >= 4):
         cv2.line(v_frame, new_epoints[2], new_epoints[3], (0,0,255), draw_line_width)
-        #draw stringlabel at the last point
-        cv2.putText(v_frame, '*', new_epoints[3], cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 255, 0))
+        p = new_epoints[2]
+        q = new_epoints[3]
+
+        color = (0,0,255)
+        thickness = draw_line_width
+        line_type = 8
+        shift = 0
+        arrow_magnitude = 9
+        image = v_frame
+
+        # draw arrow tail
+        cv2.line(v_frame, p, q, color, thickness, line_type, shift)
+        # calc angle of the arrow
+        angle = np.arctan2(p[1]-q[1], p[0]-q[0])
+        # starting point of first line of arrow head
+        p = (int(q[0] + arrow_magnitude * np.cos(angle + np.pi/4)),
+        int(q[1] + arrow_magnitude * np.sin(angle + np.pi/4)))
+        # draw first half of arrow head
+        cv2.line(image, p, q, color, thickness, line_type, shift)
+        # starting point of second line of arrow head
+        p = (int(q[0] + arrow_magnitude * np.cos(angle - np.pi/4)),
+        int(q[1] + arrow_magnitude * np.sin(angle - np.pi/4)))
+        # draw second half of arrow head
+        cv2.line(image, p, q, color, thickness, line_type, shift)
 
 
     if(len(new_epoints) > 2):
@@ -200,6 +261,7 @@ while (True):
     if cvui.button(frame, layout_space_video + video_size_x + 30, 90, 'Set Zone'):
         setZone = 1
         setEntryExit = 0
+        triggerSave = 1
 
     if cvui.button(frame, layout_space_video + video_size_x + 30, 130, 'Set Entry/Exit'):
         setZone = 0
@@ -212,21 +274,33 @@ while (True):
         if(len(new_points) > 2):
             cv2.fillPoly(v_frame, np.array([new_points]), (255, 255, 255))
 
+        #normal zones:
         conv_points = []
 
         for point in new_points:
             conv_points.append((point[0]/video_size_x, point[1]/video_size_y))
 
-        if(''.join(new_stringLabel) != '' or len(new_points) != 0):
+        #entry/exit:
+        conv_epoints = []
+        for point in new_epoints:
+            conv_epoints.append((point[0]/video_size_x, point[1]/video_size_y))
+
+
+
+
+
+        if(''.join(new_stringLabel) != '' or len(new_points) != 0 or len(new_epoints) != 0):
             data['savedPoints'].append({
                 'label': ''.join(new_stringLabel),
-                'points': conv_points
+                'points': conv_points,
+                'epoints': conv_epoints
                 })
-            objects = [new_stringLabel, new_points]
+            objects = [new_stringLabel, new_points, new_epoints]
             savedPointsCol.append(objects)
             #clear points
             new_stringLabel = []
             new_points = []
+            new_epoints = []
 
             #print(objects)
             # redraw points and label using objects
