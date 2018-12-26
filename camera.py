@@ -168,6 +168,24 @@ draw_line_width = 2
 draw_points_width = 4
 
 
+#entrence detection
+# 1 = top->bottom, 2 = bottom->top, 3 = left->right, 4 = right->left
+e_direction = 0
+e_min_x = 0
+e_max_x = 0
+e_min_y = 0
+e_max_y = 0
+
+temp_save_start_x = 0
+temp_save_start_y = 0
+temp_save_end_x = 0
+temp_save_end_y = 0
+
+#zones detection
+all_zones = []
+all_zones_label = []
+all_canvas = []
+
 
 #zones
 points=[]
@@ -187,6 +205,64 @@ with open('config.txt', 'r') as cfgfile:
         cfgfile.seek(0) #first character wasn't empty, return to start of file.
         # refill the zones
         data = json.load(cfgfile)
+
+if(data):
+    
+    for p in data['savedPoints']:
+        stringLabel = p['label']
+        points_temp = []
+        for point in p['points']:
+            points_temp.append((int(point[0]*video_size_x),int(point[1]*video_size_y)))
+        
+        if(len(points_temp) > 1):
+            all_zones.append(points_temp)
+            all_zones_label.append(stringLabel)
+            
+            canvas = np.zeros((640, 480), np.uint8)
+            cv2.fillPoly(canvas, np.array([points_temp]), (255, 255, 255))
+            all_canvas.append(canvas)
+    
+    
+    for p in data['savedPoints']:
+        e_points_counter = 1
+        for epoint in p['epoints']:
+            if(e_points_counter == 1):
+                e_min_x = int(epoint[0]*video_size_x)
+                e_min_y = int(epoint[1]*video_size_y)
+                
+                
+            elif(e_points_counter == 2):
+                e_max_x = int(epoint[0]*video_size_x)
+                e_max_y = int(epoint[1]*video_size_y)
+            
+            elif(e_points_counter == 3):
+                temp_save_start_x = int(epoint[0]*video_size_x)
+                temp_save_start_y = int(epoint[1]*video_size_y)
+            
+            elif(e_points_counter == 4):
+                temp_save_end_x = int(epoint[0]*video_size_x)
+                temp_save_end_y = int(epoint[1]*video_size_y)
+                
+                if(temp_save_start_x >= e_min_x and temp_save_start_x <= e_max_x and
+                   temp_save_end_x >= e_min_x and temp_save_end_x <= e_max_x):
+                    if(temp_save_start_y > temp_save_end_y):
+                        e_direction = 2
+                        
+                    else:
+                        e_direction = 1
+                    
+                else:
+                    if(temp_save_start_x > temp_save_end_x):
+                        e_direction = 4
+                    else:
+                        e_direction = 3
+                
+                
+            e_points_counter = e_points_counter + 1
+                
+            
+cv2.imshow("asdasdads", all_canvas[-1])
+cv2.waitKey()
 
 
 #testing
@@ -388,12 +464,14 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
             person_canvas = np.zeros((640, 480), np.uint8)
             cv2.rectangle(person_canvas, (ap.curr_x, ap.curr_y),
                           (ap.curr_x + ap.curr_w, ap.curr_y + ap.curr_h), (255, 255, 255), -1)
-
-
-            bitwise_different = cv2.bitwise_and(canvas, person_canvas)
+            
+            highest_count = 0
+            highest_index = -1
+            for c in range (0, len(all_canvas)):
+                bitwise_different = cv2.bitwise_and(all_canvas[c], person_canvas)
             #gray = cv2.cvtColor(bitwise_different, cv2.COLOR_BGR2GRAY)
 
-            nzCount = cv2.countNonZero(bitwise_different)
+                nzCount = cv2.countNonZero(bitwise_different)
 
 
 
@@ -547,19 +625,18 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
             cv2.putText(image, putText, (ap.curr_x, ap.curr_y), cv2.FONT_HERSHEY_SIMPLEX,
                         0.5, (255,255,255), 2, cv2.LINE_AA)
 
-        cv2.rectangle(image, (120, 240), (250, 260), (0, 255, 0), 2)
 
+
+        #cv2.rectangle(image, (120, 240), (250, 260), (0, 255, 0), 2)
+        
+        #1 = top->bottom, 2 = bottom->top, 3 = left->right, 4 = right->left
+        #direction = 0
+            
         for ap in all_person:
-            if(len(ap.previous_x) >= 4):
+            if(len(ap.previous_x) >= 4 and ap.previous_x[-1] >= e_min_x and ap.previous_x[-1] <= e_max_x and
+                   ap.previous_y[-1] >= e_min_y and ap.previous_y[-1] <= e_max_y):
                 #print("(", str(ap.previous_x[-1]), ", ", ap.previous_y[-1], ")")
-                if(ap.previous_x[-1] >= 120 and ap.previous_x[-1] <= 250 and
-                   ap.previous_y[-1] >= 240 and ap.previous_y[-1] <= 260):
-                    #print(str(ap.name))
-                    #print(str(ap.previous_x[-1]), ",", str(ap.previous_y[-1]))
-                    #print(str(ap.previous_x[-2]), ",", str(ap.previous_y[-2]))
-                    #print(str(ap.previous_x[-3]), ",", str(ap.previous_y[-3]))
-                    #print(str(ap.previous_x[-4]), ",", str(ap.previous_y[-4]))
-                    #print('end')
+                if(e_direction == 1):
                     if( ap.previous_y[-1] < ap.previous_y[-2] and
                         ap.previous_y[-2] < ap.previous_y[-3] and
                         ap.previous_y[-3] < ap.previous_y[-4] and ap.exit == False):
@@ -570,6 +647,45 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                           ap.previous_y[-3] > ap.previous_y[-4] and ap.enter == False ):
                         print('enter to shop, welcome ')
                         ap.enter = True
+                
+                elif(e_direction == 2):
+                    if( ap.previous_y[-1] > ap.previous_y[-2] and
+                        ap.previous_y[-2] > ap.previous_y[-3] and
+                        ap.previous_y[-3] > ap.previous_y[-4] and ap.exit == False):
+                        print('byebye')
+                        ap.exit = True
+                    elif( ap.previous_y[-1] < ap.previous_y[-2] and
+                          ap.previous_y[-2] < ap.previous_y[-3] and
+                          ap.previous_y[-3] < ap.previous_y[-4] and ap.enter == False ):
+                        print('enter to shop, welcome ')
+                        ap.enter = True
+                    
+                elif(e_direction == 3):
+                    if( ap.previous_x[-1] < ap.previous_x[-2] and
+                        ap.previous_x[-2] < ap.previous_x[-3] and
+                        ap.previous_x[-3] < ap.previous_x[-4] and ap.exit == False):
+                        print('byebye')
+                        ap.exit = True
+                    elif( ap.previous_x[-1] > ap.previous_x[-2] and
+                          ap.previous_x[-2] > ap.previous_x[-3] and
+                          ap.previous_x[-3] > ap.previous_x[-4] and ap.enter == False ):
+                        print('enter to shop, welcome ')
+                        ap.enter = True
+                    
+                elif(e_direction == 4):
+                    if( ap.previous_x[-1] > ap.previous_x[-2] and
+                        ap.previous_x[-2] > ap.previous_x[-3] and
+                        ap.previous_x[-3] > ap.previous_x[-4] and ap.exit == False):
+                        print('byebye')
+                        ap.exit = True
+                    elif( ap.previous_x[-1] < ap.previous_x[-2] and
+                          ap.previous_x[-2] < ap.previous_x[-3] and
+                          ap.previous_x[-3] < ap.previous_x[-4] and ap.enter == False ):
+                        print('enter to shop, welcome ')
+                        ap.enter = True
+                
+                
+                
 
         #cv2.line(image, (150, 280), (250, 280), (0,255,0), 2)
         templist = []
