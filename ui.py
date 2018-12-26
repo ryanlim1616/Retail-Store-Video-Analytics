@@ -2,6 +2,9 @@ import numpy as np
 import cv2
 import cvui
 import json
+import time
+from picamera.array import PiRGBArray
+from picamera import PiCamera
 
 
 WINDOW_NAME	= 'GUI'
@@ -11,7 +14,7 @@ cvui.init(WINDOW_NAME)
 
 
 #cap = cv2.imread('test2.jpg')
-cap = cv2.VideoCapture('test.mp4')
+#cap = cv2.VideoCapture('test.mp4')
 
 current = (0, 0)
 #zone:
@@ -51,6 +54,16 @@ path = 'config.txt'
 data = {}
 data['savedPoints'] = []
 triggerSave = 0
+
+
+#read from picamera
+camera = PiCamera()
+camera.resolution = (video_size_x, video_size_y)
+camera.rotation = camera_rotation
+camera.framerate = camera_framerate
+rawCapture = PiRGBArray(camera, size = (video_size_x, video_size_y))
+
+time.sleep(0.1)
 
 
 
@@ -114,12 +127,10 @@ with open('config.txt', 'r') as cfgfile:
 
 
 
-while (True):
-
-
+for i_frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
+    v_frame = i_frame.array
     frame[:] = (49, 52, 49)
-    ret, v_frame = cap.read()
-    #v_frame = cap
+
 
     if setZone:
         mouse_click()
@@ -324,7 +335,7 @@ while (True):
 
     key = cv2.waitKey(20)
 
-
+    rawCapture.truncate(0)
     if key == 27:
         break
     elif key != -1:
