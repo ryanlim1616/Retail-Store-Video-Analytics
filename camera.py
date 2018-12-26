@@ -4,7 +4,7 @@ import time
 import math
 from picamera.array import PiRGBArray
 from picamera import PiCamera
-
+import json
 
 class Person:
 
@@ -161,6 +161,33 @@ min_height = 50
 store_buffer = 10
 distance_thres = 80
 to_delete_buffer = 10
+video_size_x = 640
+video_size_y = 480
+
+draw_line_width = 2
+draw_points_width = 4
+
+
+
+#zones
+points=[]
+new_points = []
+
+#entry/exit:
+epoints = []
+new_epoints = []
+
+#read config file
+with open('config.txt', 'r') as cfgfile:
+    cfgfile.seek(0) #start of file
+    first_char = cfgfile.read(1) #get the first character
+    if not first_char:
+        print ("Empty File") #first character is the empty string..
+    else:
+        cfgfile.seek(0) #first character wasn't empty, return to start of file.
+        # refill the zones
+        data = json.load(cfgfile)
+
 
 #testing
 all_person = []
@@ -196,11 +223,75 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
     if(first_time == True):
         first_time = False
         backSubtractor = BackGroundSubtractor(0.001,denoise(image))
+
+
+
     else:
         start = time.time()
         templist = []
 
 
+        if(data):
+            for p in data['savedPoints']:
+                stringLabel = p['label']
+                points = []
+                for point in p['points']:
+                    points.append((int(point[0]*video_size_x),int(point[1]*video_size_y)))
+
+                    if(len(points) > 1):
+                        for i in range (len(points) - 1):
+                            cv2.line(image, points[i], points[i + 1], (0,255,0), draw_line_width)
+
+                    for point in points:
+                        cv2.circle(image, tuple(point), draw_points_width, (0,0,255))
+
+                    if(len(points) > 2):
+                        fill_poligon = True
+
+
+                if(fill_poligon and len(points) != 0):
+                    cv2.line(image, points[0], points[len(points) - 1], (0,255,0), draw_line_width)
+
+                    #draw stringlabel at the last point
+                    cv2.putText(image, ''.join(stringLabel), points[-1], cv2.FONT_HERSHEY_SIMPLEX, 1, (100, 255, 0))
+
+                epoints = []
+                for epoint in p['epoints']:
+                    epoints.append((int(epoint[0]*video_size_x),int(epoint[1]*video_size_y)))
+
+                if(len(epoints)>=2):
+                    cv2.rectangle(image, epoints[0], epoints[1], (0,0,255), draw_line_width)
+
+
+                if(len(epoints) >= 4):
+                    cv2.line(image, epoints[2], epoints[3], (0,0,255), draw_line_width)
+                    p = epoints[2]
+                    q = epoints[3]
+
+                    color = (0,0,255)
+                    thickness = draw_line_width
+                    line_type = 8
+                    shift = 0
+                    arrow_magnitude = 9
+
+                    # draw arrow tail
+                    cv2.line(image, p, q, color, thickness, line_type, shift)
+                    # calc angle of the arrow
+                    angle = np.arctan2(p[1]-q[1], p[0]-q[0])
+                    # starting point of first line of arrow head
+                    p = (int(q[0] + arrow_magnitude * np.cos(angle + np.pi/4)),
+                    int(q[1] + arrow_magnitude * np.sin(angle + np.pi/4)))
+                    # draw first half of arrow head
+                    cv2.line(image, p, q, color, thickness, line_type, shift)
+                    # starting point of second line of arrow head
+                    p = (int(q[0] + arrow_magnitude * np.cos(angle - np.pi/4)),
+                    int(q[1] + arrow_magnitude * np.sin(angle - np.pi/4)))
+                    # draw second half of arrow head
+                    cv2.line(image, p, q, color, thickness, line_type, shift)
+
+
+                if(len(epoints) > 2):
+                    fill_poligon = True
         #mask = backSubtractor.getForeground(denoise(image))
         #ret, mask = cv2.threshold(mask, 15, 255, cv2.THRESH_BINARY)
         #mask = cv2.cvtColor(mask, cv2.COLOR_BGR2GRAY);

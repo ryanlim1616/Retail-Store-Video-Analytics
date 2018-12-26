@@ -33,7 +33,8 @@ video_size_y = 480
 layout_space_video = 10
 draw_line_width = 2
 draw_points_width = 4
-
+camera_rotation = 180
+camera_framerate = 20
 
 
 #init variable
