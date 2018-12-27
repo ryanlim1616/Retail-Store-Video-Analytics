@@ -466,36 +466,34 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                           (ap.curr_x + ap.curr_w, ap.curr_y + ap.curr_h), (255, 255, 255), -1)
             
             highest_count = 0
-            highest_index = -1
+            highest_index = 0
             for c in range (0, len(all_canvas)):
                 bitwise_different = cv2.bitwise_and(all_canvas[c], person_canvas)
             #gray = cv2.cvtColor(bitwise_different, cv2.COLOR_BGR2GRAY)
 
                 nzCount = cv2.countNonZero(bitwise_different)
-
-
-
-
-            if(nzCount > 0):
-                if(ap.curr_area == 0 and ap.plan_to_enter_area != 1):
-                    ap.plan_to_enter_area = 1
+                if(nzCount > highest_count):
+                    highest_index = c + 1
+            
+            
+            if(highest_index > 0): 
+                if(ap.curr_area != highest_index and ap.plan_to_enter_area != highest_index):
+                    ap.plan_to_enter_area = highest_index
                     ap.plan_to_enter_area_count = 1
-
-                elif(p.curr_area == 1):
+                    
+                elif(ap.curr_area == highest_index):
                     ap.plan_to_enter_area = 0
                     ap.plan_to_enter_area_count = 0
-
-                if(ap.plan_to_enter_area == 1):
+                
+                if(ap.plan_to_enter_area == highest_index):
                     #print("testing")
                     ap.plan_to_enter_area_count = ap.plan_to_enter_area_count + 1
                     if(ap.plan_to_enter_area_count > 5):
-                        print(ap.name, " Enter area 1")
-                        ap.curr_area = 1
+                        print(ap.name, " Enter area ", all_zones_label[highest_index - 1])
+                        ap.curr_area = highest_index
                         ap.plan_to_enter_area = 0
                         ap.plan_to_enter_area_count = 0
-
-
-
+                
             else:
                 if(ap.curr_area != 0):
                     ap.plan_to_enter_area_count = ap.plan_to_enter_area_count + 1
@@ -508,6 +506,9 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                 if(ap.plan_to_enter_area != 0):
                     ap.plan_to_enter_area = 0
                     ap.plan_to_enter_area_count = 0
+        
+        
+            
 
 
 
