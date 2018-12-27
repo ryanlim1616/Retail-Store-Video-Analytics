@@ -7,6 +7,9 @@ from picamera import PiCamera
 import json
 import datetime
 
+#for AWS
+import boto3
+
 class Person:
 
     def __init__(self, buffer, x, y, w, h):
@@ -146,6 +149,80 @@ def denoise(frame):
 def mousePosition(event, x, y, flags,param):
     if event == cv2.EVENT_LBUTTONDOWN:
         print("(", x, ", ", y, ")")
+
+
+# ----------------- START OF AWS ----------------------------------------------------------
+
+#aws params
+AWS_ACCESS_KEY = 'AKIAJM6YUFF5PQGWWIWQ'
+AWS_SECRET_ACCESS = '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'
+REGION = 'ap-southeast-1'
+
+
+TABLE_NAME = 'RetailStoreStats'
+
+def createTable(client):
+    table = client.create_table(
+        TableName=TABLE_NAME,
+        KeySchema=[
+            {
+                'AttributeName': 'timestamp-id',
+                'KeyType': 'HASH'
+            }
+        ],
+        AttributeDefinitions=[
+            {
+                'AttributeName': 'timestamp-id',
+                'AttributeType': 'N'
+            }
+
+        ],
+        ProvisionedThroughput={
+            'ReadCapacityUnits': 5,
+            'WriteCapacityUnits': 5
+        }
+    )
+
+    # Wait until the table exists.
+    client.get_waiter('table_exists').wait(TableName=TABLE_NAME)
+    print ("Table with name %s created.\n", TABLE_NAME)
+
+
+
+def writeDB(client, timestamp_id, timestamp, person):
+    print(person)
+    response = client.put_item(
+        TableName=TABLE_NAME,
+        Item={
+            'record-id': { 'N': timestamp_id },
+            'timestamp':{'S': timestamp},
+            'pattern': { 'M': person }
+        }
+    )
+    print ("Item with id %s and pattern %s saved.\n", timestamp, person)
+
+
+
+
+
+# Get the service resource.
+try:
+    dynamodbClient = boto3.client(
+        'dynamodb',
+        aws_access_key_id=AWS_ACCESS_KEY,
+        aws_secret_access_key=AWS_SECRET_ACCESS,
+        region_name='eu-west-1'
+        )
+
+    response = dynamodbClient.describe_table(TableName=TABLE_NAME)
+    print(response)
+
+except dynamodbClient.exceptions.ResourceNotFoundException:
+    # do something here as you require
+    print('error, db table not found')
+    pass
+
+# ----------------- END OF AWS ----------------------------------------------------------
 
 camera = PiCamera()
 camera.resolution = (640, 480)
