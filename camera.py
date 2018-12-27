@@ -154,8 +154,8 @@ def mousePosition(event, x, y, flags,param):
 # ----------------- START OF AWS ----------------------------------------------------------
 
 #aws params
-AWS_ACCESS_KEY = 'AKIAJM6YUFF5PQGWWIWQ'
-AWS_SECRET_ACCESS = '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'
+AWS_ACCESS_KEY = ''
+AWS_SECRET_ACCESS = ''
 REGION = 'ap-southeast-1'
 
 
