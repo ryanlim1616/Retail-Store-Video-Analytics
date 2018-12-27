@@ -44,6 +44,9 @@ class Person:
         self.colorterm = {'Black':0, 'White':0, 'Gray':0, 'Red':0 , 'Green':0 , 'Blue':0 , 'Yellow':0 , 'Orange':0 , 'Pink':0 , 'Purple':0 , 'Brown':0}
         self.colors = []
         self.meanColor =(999,999,999)
+        self.highestColorTermTop = ""
+        self.highestColorTermBot = ""
+
 
 
     def set_name(self, name):
@@ -457,23 +460,26 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
             if(o.delete_buffer > to_delete_buffer):
                 del all_person[i]
                 break
-        
+
         #dump data to TXT
         data_to_save = {}
         data_to_save['timeStamp'] = str(datetime.datetime.now())
         data_to_save['person'] = []
-        
-        
-        
+
+
+
         for ap in all_person:
-            
+
             data_to_save['person'].append({
                 'id': ap.name,
                 'x': ap.curr_x,
                 'y': ap.curr_y,
                 'w': ap.curr_w,
                 'h': ap.curr_h,
-                'activity': ''
+                'activity': '',
+                'c_top':ap.highestColorTermTop,
+                'c_bot':ap.highestColorTermBot,
+                'c_Term': ap.colorterm
                 })
 
             person_canvas = np.zeros((640, 480), np.uint8)
@@ -505,9 +511,9 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                     ap.plan_to_enter_area_count = ap.plan_to_enter_area_count + 1
                     if(ap.plan_to_enter_area_count > 5):
                         print(ap.name, " Enter area ", all_zones_label[highest_index - 1])
-                        
+
                         data_to_save['person'][-1]['activity'] = 'Area ' + all_zones_label[highest_index - 1]
-                        
+
                         ap.curr_area = highest_index
                         ap.plan_to_enter_area = 0
                         ap.plan_to_enter_area_count = 0
@@ -517,9 +523,9 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                     ap.plan_to_enter_area_count = ap.plan_to_enter_area_count + 1
                     if(ap.plan_to_enter_area_count > 5):
                         print(ap.name, " Enter area 0")
-                        
+
                         data_to_save['person'][-1]['activity'] = 'Area main'
-                        
+
                         ap.curr_area = 0
                         ap.plan_to_enter_area = 0
                         ap.plan_to_enter_area_count = 0
@@ -527,8 +533,8 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                 if(ap.plan_to_enter_area != 0):
                     ap.plan_to_enter_area = 0
                     ap.plan_to_enter_area_count = 0
-            
-            
+
+
             if(len(ap.previous_x) >= 4 and ap.previous_x[-1] >= e_min_x and ap.previous_x[-1] <= e_max_x and
                    ap.previous_y[-1] >= e_min_y and ap.previous_y[-1] <= e_max_y):
                 #print("(", str(ap.previous_x[-1]), ", ", ap.previous_y[-1], ")")
@@ -536,9 +542,9 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                     if( ap.previous_y[-1] < ap.previous_y[-2] and
                         ap.previous_y[-2] < ap.previous_y[-3] and
                         ap.previous_y[-3] < ap.previous_y[-4] and ap.exit == False):
-                        
+
                         data_to_save['person'][-1]['activity'] = 'Exit Shop'
-                        
+
                         print('byebye')
                         ap.exit = True
                     elif( ap.previous_y[-1] > ap.previous_y[-2] and
@@ -553,7 +559,7 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                         ap.previous_y[-2] > ap.previous_y[-3] and
                         ap.previous_y[-3] > ap.previous_y[-4] and ap.exit == False):
                         print('byebye')
-                        
+
                         data_to_save['person'][-1]['activity'] = 'Exit Shop'
                         ap.exit = True
                     elif( ap.previous_y[-1] < ap.previous_y[-2] and
@@ -600,110 +606,140 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
 
             # ------ START OF COLORS -----------
 
-            crop_img_hsv = cv2.cvtColor(crop_img, cv2.COLOR_BGR2HSV)
-            hbins = 15
-            sbins = 8
-            vbins = 8
+            # divide mat into top half and bottom half
 
-            histSize = [ hbins, sbins, vbins ]
+            cropped_top = image[ap.curr_y:int(ap.curr_y + (ap.curr_h)/2), ap.curr_x:ap.curr_x + ap.curr_w]
+            cropped_bot = image[int(ap.curr_y + (ap.curr_h)/2):ap.curr_y + ap.curr_h, ap.curr_x:ap.curr_x + ap.curr_w]
 
-            hranges = [ 0, 180 ]
-            sranges = [ 0, 256 ]
-            vranges = [ 0, 256 ]
+            crop_img_all =[cropped_top, cropped_bot]
 
-            ranges = [ hranges, sranges, vranges ]
-
-            channels = [ 0, 1, 2 ]
-
-            #hist = cv2.calcHist([crop_img], channels, None, histSize, ranges)
-            hist_h = cv2.calcHist([crop_img_hsv], [0], None, [hbins], [0,180])
-            hist_s = cv2.calcHist([crop_img_hsv], [1], None, [sbins], [0,256])
-            hist_v = cv2.calcHist([crop_img_hsv], [2], None, [vbins], [0,256])
-
-            #get top 1 color
-            _, _, _, max_loc_h = cv2.minMaxLoc(hist_h)
-            _, _, _, max_loc_s = cv2.minMaxLoc(hist_s)
-            _, _, _, max_loc_v = cv2.minMaxLoc(hist_v)
-
-            #print(max_loc_h[1],max_loc_s[1],max_loc_v[1])
-
-            scalar_color = (max_loc_h[1]*12, max_loc_s[1]*32+40, max_loc_v[1]*32)
-
-            crop_img_hsv[:] =(scalar_color)
-            crop_img_hsv = cv2.cvtColor(crop_img_hsv, cv2.COLOR_HSV2BGR)
-
-            #in BGR color space:
-            meanCurr = cv2.mean(crop_img_hsv)
-
-            if(ap.meanColor == (999,999,999)):
-                ap.meanColor = meanCurr
-            else:
-                ap.meanColor = ((ap.meanColor[0]+meanCurr[0])/2,(ap.meanColor[1]+meanCurr[1])/2,(ap.meanColor[2]+meanCurr[2])/2)
-                scalar_color = ap.meanColor
-                print(ap.name, meanCurr, ap.meanColor)
-
-            #cv2.imshow("color", crop_img_hsv)
-
-            #ground truth colors
-            SBlack = (0.0, 0.0, 0.0)
-            SWhite = (255.0, 255.0, 255.0)
-            SGray = (145.0, 149.0, 146.0)
-            SRed = (0.0, 0.0, 229.0)
-            SGreen = (26.0, 176.0, 21.0)
-            SBlue = (223.0, 67.0, 3.0)
-            SYellow = (20.0, 255.0, 255.0)
-            SOrange = (6.0, 115.0, 249.0)
-            SPink = (192.0, 129.0, 255.0)
-            SPurple = (156.0, 30.0, 126.0)
-            SBrown = (0.0, 55.0, 101.0)
-
-            all_colors = [SBlack, SWhite, SGray, SRed, SGreen, SBlue, SYellow, SOrange, SPink, SPurple, SBrown]
-
-            colorTermPercentage =[]
-            max_distance = math.sqrt(((512 + 127/256)*65025) + (260100) + ((512 + (255-127)/256)*65025))
-
-            for gtcolor in all_colors:
-                rmean = (gtcolor[2] + scalar_color[2]) / 2
-                r = gtcolor[2] - scalar_color[2]
-                g = gtcolor[1] - scalar_color[1]
-                b = gtcolor[0] - scalar_color[0]
-                colorTermPercentage.append(math.sqrt(((512 + rmean/256)*r*r) + (4*g*g) + ((512 + (255-rmean)/256)*b*b))/max_distance)
+            for idx, crops in enumerate(crop_img_all):
+                #cv2.imshow("top", cropped_top)
+                #cv2.imshow("bot", cropped_bot)
 
 
-            #set colors
-            #cant use for loop as the dictionary does not loop according to idx
-            #for idx, terms in enumerate(ap.colorterm):
-            #    print (terms)
-            #    ap.colorterm[terms] = colorTermPercentage[idx]
+                crop_img_hsv = cv2.cvtColor(crops, cv2.COLOR_BGR2HSV)
+                hbins = 15
+                sbins = 8
+                vbins = 8
 
-            #print(colorTermPercentage)
+                histSize = [ hbins, sbins, vbins ]
 
-            ap.colorterm['Black'] = colorTermPercentage[0]
-            ap.colorterm['White'] = colorTermPercentage[1]
-            ap.colorterm['Gray'] = colorTermPercentage[2]
-            ap.colorterm['Red'] = colorTermPercentage[3]
-            ap.colorterm['Green'] = colorTermPercentage[4]
-            ap.colorterm['Blue'] = colorTermPercentage[5]
-            ap.colorterm['Yellow'] = colorTermPercentage[6]
-            ap.colorterm['Orange'] = colorTermPercentage[7]
-            ap.colorterm['Pink'] = colorTermPercentage[8]
-            ap.colorterm['Purple'] = colorTermPercentage[9]
-            ap.colorterm['Brown'] = colorTermPercentage[10]
+                hranges = [ 0, 180 ]
+                sranges = [ 0, 256 ]
+                vranges = [ 0, 256 ]
 
-            sorted_by_value = sorted(ap.colorterm.items(), key=lambda kv: kv[1])
-            sorted_by_value.reverse()
+                ranges = [ hranges, sranges, vranges ]
 
-            print(ap.name, sorted_by_value)
-            #print(max(ap.colorterm, key=ap.colorterm.get))
+                channels = [ 0, 1, 2 ]
 
-            finalTerm = max(ap.colorterm, key=ap.colorterm.get)
-            ap.highestColorTerm = finalTerm
+                #hist = cv2.calcHist([crop_img], channels, None, histSize, ranges)
+                hist_h = cv2.calcHist([crop_img_hsv], [0], None, [hbins], [0,180])
+                hist_s = cv2.calcHist([crop_img_hsv], [1], None, [sbins], [0,256])
+                hist_v = cv2.calcHist([crop_img_hsv], [2], None, [vbins], [0,256])
+
+                #get top 1 color
+                _, _, _, max_loc_h = cv2.minMaxLoc(hist_h)
+                _, _, _, max_loc_s = cv2.minMaxLoc(hist_s)
+                _, _, _, max_loc_v = cv2.minMaxLoc(hist_v)
+
+                #print(max_loc_h[1],max_loc_s[1],max_loc_v[1])
+
+                #artifically increase the saturation of the colors (s+40)
+                scalar_color = (max_loc_h[1]*12, max_loc_s[1]*32+40, max_loc_v[1]*32)
+
+                crop_img_hsv[:] =(scalar_color)
+                crop_img_hsv = cv2.cvtColor(crop_img_hsv, cv2.COLOR_HSV2BGR)
+
+                #in BGR color space:
+                meanCurr = cv2.mean(crop_img_hsv)
+
+                if(ap.meanColor == (999,999,999)):
+                    ap.meanColor = meanCurr
+                else:
+                    ap.meanColor = ((ap.meanColor[0]+meanCurr[0])/2,(ap.meanColor[1]+meanCurr[1])/2,(ap.meanColor[2]+meanCurr[2])/2)
+                    scalar_color = ap.meanColor
+                    #print(ap.name, meanCurr, ap.meanColor)
+
+                #cv2.imshow("color", crop_img_hsv)
+
+                #ground truth colors
+                SBlack = (0.0, 0.0, 0.0)
+                SWhite = (255.0, 255.0, 255.0)
+                #ori: SGray = (145.0, 149.0, 146.0)
+                SGray = (125.0, 129.0, 126.0)
+                SRed = (0.0, 0.0, 229.0)
+                #ori: SGreen = (26.0, 176.0, 21.0)
+                SGreen = (26.0, 216.0, 21.0)
+                SBlue = (223.0, 67.0, 3.0)
+                SYellow = (20.0, 255.0, 255.0)
+                SOrange = (6.0, 115.0, 249.0)
+                #ori: SPink = (192.0, 129.0, 255.0)
+                SPink = (182.0, 129.0, 255.0)
+                SPurple = (156.0, 30.0, 126.0)
+                SBrown = (0.0, 55.0, 101.0)
+
+                all_colors = [SBlack, SWhite, SGray, SRed, SGreen, SBlue, SYellow, SOrange, SPink, SPurple, SBrown]
+
+                colorTermPercentage =[]
+                max_distance = math.sqrt(((512 + 127/256)*65025) + (260100) + ((512 + (255-127)/256)*65025))
+
+                for gtcolor in all_colors:
+                    rmean = (gtcolor[2] + scalar_color[2]) / 2
+                    r = gtcolor[2] - scalar_color[2]
+                    g = gtcolor[1] - scalar_color[1]
+                    b = gtcolor[0] - scalar_color[0]
+                    c_diff = math.sqrt(((512 + rmean/256)*r*r) + (4*g*g) + ((512 + (255-rmean)/256)*b*b))
+                    colorTermPercentage.append((max_distance - c_diff)/max_distance)
+                    #print (gtcolor, scalar_color, c_diff)
+
+
+                #set colors
+                #cant use for loop as the dictionary does not loop according to idx
+                #for idx, terms in enumerate(ap.colorterm):
+                #    print (terms)
+                #    ap.colorterm[terms] = colorTermPercentage[idx]
+
+                #print(colorTermPercentage)
+
+                ap.colorterm['Black'] = colorTermPercentage[0]
+                ap.colorterm['White'] = colorTermPercentage[1]
+                ap.colorterm['Gray'] = colorTermPercentage[2]
+                ap.colorterm['Red'] = colorTermPercentage[3]
+                ap.colorterm['Green'] = colorTermPercentage[4]
+                ap.colorterm['Blue'] = colorTermPercentage[5]
+                ap.colorterm['Yellow'] = colorTermPercentage[6]
+                ap.colorterm['Orange'] = colorTermPercentage[7]
+                ap.colorterm['Pink'] = colorTermPercentage[8]
+                ap.colorterm['Purple'] = colorTermPercentage[9]
+                ap.colorterm['Brown'] = colorTermPercentage[10]
+
+                sorted_by_value = sorted(ap.colorterm.items(), key=lambda kv: kv[1])
+                sorted_by_value.reverse()
+
+                #print(ap.name, sorted_by_value)
+                #print(max(ap.colorterm, key=ap.colorterm.get))
+
+                finalTerm = max(ap.colorterm, key=ap.colorterm.get)
+
+                if(idx == 0):
+                    ap.highestColorTermTop = finalTerm
+                    #print(ap.name, "top: ", finalTerm, sorted_by_value)
+                else:
+                    ap.highestColorTermBot = finalTerm
+                    #print(ap.name, "Bot: ", finalTerm, sorted_by_value)
+                    #print("----------------------------")
+
+            data_to_save['person'][-1]['c_top'] = ap.highestColorTermTop
+            data_to_save['person'][-1]['c_bot'] = ap.highestColorTermBot
+            data_to_save['person'][-1]['c_Term'] = ap.colorterm
+
+            print(data_to_save)
 
 
             # ------ END OF COLORS -----------
 
-            putText = str(ap.name) + ", " + str(finalTerm
-            )
+            putText = str(ap.name) + ", (" + str(ap.highestColorTermTop) + ", " + str(ap.highestColorTermBot) + ")"
             cv2.rectangle(image, (ap.curr_x, ap.curr_y),
                           (ap.curr_x + ap.curr_w, ap.curr_y + ap.curr_h), (255, 0, 0), 2)
             cv2.putText(image, putText, (ap.curr_x, ap.curr_y), cv2.FONT_HERSHEY_SIMPLEX,
@@ -719,8 +755,8 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
         #1 = top->bottom, 2 = bottom->top, 3 = left->right, 4 = right->left
         #direction = 0
 
-        
-            
+
+
 
 
 
