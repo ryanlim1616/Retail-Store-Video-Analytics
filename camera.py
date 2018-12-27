@@ -5,6 +5,7 @@ import math
 from picamera.array import PiRGBArray
 from picamera import PiCamera
 import json
+import datetime
 
 class Person:
 
@@ -207,62 +208,60 @@ with open('config.txt', 'r') as cfgfile:
         data = json.load(cfgfile)
 
 if(data):
-    
+
     for p in data['savedPoints']:
         stringLabel = p['label']
         points_temp = []
         for point in p['points']:
             points_temp.append((int(point[0]*video_size_x),int(point[1]*video_size_y)))
-        
+
         if(len(points_temp) > 1):
             all_zones.append(points_temp)
             all_zones_label.append(stringLabel)
-            
+
             canvas = np.zeros((640, 480), np.uint8)
             cv2.fillPoly(canvas, np.array([points_temp]), (255, 255, 255))
             all_canvas.append(canvas)
-    
-    
+
+
     for p in data['savedPoints']:
         e_points_counter = 1
         for epoint in p['epoints']:
             if(e_points_counter == 1):
                 e_min_x = int(epoint[0]*video_size_x)
                 e_min_y = int(epoint[1]*video_size_y)
-                
-                
+
+
             elif(e_points_counter == 2):
                 e_max_x = int(epoint[0]*video_size_x)
                 e_max_y = int(epoint[1]*video_size_y)
-            
+
             elif(e_points_counter == 3):
                 temp_save_start_x = int(epoint[0]*video_size_x)
                 temp_save_start_y = int(epoint[1]*video_size_y)
-            
+
             elif(e_points_counter == 4):
                 temp_save_end_x = int(epoint[0]*video_size_x)
                 temp_save_end_y = int(epoint[1]*video_size_y)
-                
+
                 if(temp_save_start_x >= e_min_x and temp_save_start_x <= e_max_x and
                    temp_save_end_x >= e_min_x and temp_save_end_x <= e_max_x):
                     if(temp_save_start_y > temp_save_end_y):
                         e_direction = 2
-                        
+
                     else:
                         e_direction = 1
-                    
+
                 else:
                     if(temp_save_start_x > temp_save_end_x):
                         e_direction = 4
                     else:
                         e_direction = 3
-                
-                
+
+
             e_points_counter = e_points_counter + 1
-                
-            
-cv2.imshow("asdasdads", all_canvas[-1])
-cv2.waitKey()
+
+
 
 
 #testing
@@ -344,26 +343,26 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                     p = epoints[2]
                     q = epoints[3]
 
-                    color = (0,0,255)
+                    t_color = (0,0,255)
                     thickness = draw_line_width
                     line_type = 8
                     shift = 0
                     arrow_magnitude = 9
 
                     # draw arrow tail
-                    cv2.line(image, p, q, color, thickness, line_type, shift)
+                    cv2.line(image, p, q, t_color, thickness, line_type, shift)
                     # calc angle of the arrow
                     angle = np.arctan2(p[1]-q[1], p[0]-q[0])
                     # starting point of first line of arrow head
                     p = (int(q[0] + arrow_magnitude * np.cos(angle + np.pi/4)),
                     int(q[1] + arrow_magnitude * np.sin(angle + np.pi/4)))
                     # draw first half of arrow head
-                    cv2.line(image, p, q, color, thickness, line_type, shift)
+                    cv2.line(image, p, q, t_color, thickness, line_type, shift)
                     # starting point of second line of arrow head
                     p = (int(q[0] + arrow_magnitude * np.cos(angle - np.pi/4)),
                     int(q[1] + arrow_magnitude * np.sin(angle - np.pi/4)))
                     # draw second half of arrow head
-                    cv2.line(image, p, q, color, thickness, line_type, shift)
+                    cv2.line(image, p, q, t_color, thickness, line_type, shift)
 
 
                 if(len(epoints) > 2):
@@ -458,13 +457,29 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
             if(o.delete_buffer > to_delete_buffer):
                 del all_person[i]
                 break
-
+        
+        #dump data to TXT
+        data_to_save = {}
+        data_to_save['timeStamp'] = str(datetime.datetime.now())
+        data_to_save['person'] = []
+        
+        
+        
         for ap in all_person:
+            
+            data_to_save['person'].append({
+                'id': ap.name,
+                'x': ap.curr_x,
+                'y': ap.curr_y,
+                'w': ap.curr_w,
+                'h': ap.curr_h,
+                'activity': ''
+                })
 
             person_canvas = np.zeros((640, 480), np.uint8)
             cv2.rectangle(person_canvas, (ap.curr_x, ap.curr_y),
                           (ap.curr_x + ap.curr_w, ap.curr_y + ap.curr_h), (255, 255, 255), -1)
-            
+
             highest_count = 0
             highest_index = 0
             for c in range (0, len(all_canvas)):
@@ -474,31 +489,37 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                 nzCount = cv2.countNonZero(bitwise_different)
                 if(nzCount > highest_count):
                     highest_index = c + 1
-            
-            
-            if(highest_index > 0): 
+
+
+            if(highest_index > 0):
                 if(ap.curr_area != highest_index and ap.plan_to_enter_area != highest_index):
                     ap.plan_to_enter_area = highest_index
                     ap.plan_to_enter_area_count = 1
-                    
+
                 elif(ap.curr_area == highest_index):
                     ap.plan_to_enter_area = 0
                     ap.plan_to_enter_area_count = 0
-                
+
                 if(ap.plan_to_enter_area == highest_index):
                     #print("testing")
                     ap.plan_to_enter_area_count = ap.plan_to_enter_area_count + 1
                     if(ap.plan_to_enter_area_count > 5):
                         print(ap.name, " Enter area ", all_zones_label[highest_index - 1])
+                        
+                        data_to_save['person'][-1]['activity'] = 'Area ' + all_zones_label[highest_index - 1]
+                        
                         ap.curr_area = highest_index
                         ap.plan_to_enter_area = 0
                         ap.plan_to_enter_area_count = 0
-                
+
             else:
                 if(ap.curr_area != 0):
                     ap.plan_to_enter_area_count = ap.plan_to_enter_area_count + 1
                     if(ap.plan_to_enter_area_count > 5):
                         print(ap.name, " Enter area 0")
+                        
+                        data_to_save['person'][-1]['activity'] = 'Area main'
+                        
                         ap.curr_area = 0
                         ap.plan_to_enter_area = 0
                         ap.plan_to_enter_area_count = 0
@@ -506,9 +527,71 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                 if(ap.plan_to_enter_area != 0):
                     ap.plan_to_enter_area = 0
                     ap.plan_to_enter_area_count = 0
-        
-        
             
+            
+            if(len(ap.previous_x) >= 4 and ap.previous_x[-1] >= e_min_x and ap.previous_x[-1] <= e_max_x and
+                   ap.previous_y[-1] >= e_min_y and ap.previous_y[-1] <= e_max_y):
+                #print("(", str(ap.previous_x[-1]), ", ", ap.previous_y[-1], ")")
+                if(e_direction == 1):
+                    if( ap.previous_y[-1] < ap.previous_y[-2] and
+                        ap.previous_y[-2] < ap.previous_y[-3] and
+                        ap.previous_y[-3] < ap.previous_y[-4] and ap.exit == False):
+                        
+                        data_to_save['person'][-1]['activity'] = 'Exit Shop'
+                        
+                        print('byebye')
+                        ap.exit = True
+                    elif( ap.previous_y[-1] > ap.previous_y[-2] and
+                          ap.previous_y[-2] > ap.previous_y[-3] and
+                          ap.previous_y[-3] > ap.previous_y[-4] and ap.enter == False ):
+                        print('enter to shop, welcome ')
+                        data_to_save['person'][-1]['activity'] = 'Enter Shop'
+                        ap.enter = True
+
+                elif(e_direction == 2):
+                    if( ap.previous_y[-1] > ap.previous_y[-2] and
+                        ap.previous_y[-2] > ap.previous_y[-3] and
+                        ap.previous_y[-3] > ap.previous_y[-4] and ap.exit == False):
+                        print('byebye')
+                        
+                        data_to_save['person'][-1]['activity'] = 'Exit Shop'
+                        ap.exit = True
+                    elif( ap.previous_y[-1] < ap.previous_y[-2] and
+                          ap.previous_y[-2] < ap.previous_y[-3] and
+                          ap.previous_y[-3] < ap.previous_y[-4] and ap.enter == False ):
+                        print('enter to shop, welcome ')
+                        data_to_save['person'][-1]['activity'] = 'Enter Shop'
+                        ap.enter = True
+
+                elif(e_direction == 3):
+                    if( ap.previous_x[-1] < ap.previous_x[-2] and
+                        ap.previous_x[-2] < ap.previous_x[-3] and
+                        ap.previous_x[-3] < ap.previous_x[-4] and ap.exit == False):
+                        print('byebye')
+                        data_to_save['person'][-1]['activity'] = 'Exit Shop'
+                        ap.exit = True
+                    elif( ap.previous_x[-1] > ap.previous_x[-2] and
+                          ap.previous_x[-2] > ap.previous_x[-3] and
+                          ap.previous_x[-3] > ap.previous_x[-4] and ap.enter == False ):
+                        print('enter to shop, welcome ')
+                        data_to_save['person'][-1]['activity'] = 'Enter Shop'
+                        ap.enter = True
+
+                elif(e_direction == 4):
+                    if( ap.previous_x[-1] > ap.previous_x[-2] and
+                        ap.previous_x[-2] > ap.previous_x[-3] and
+                        ap.previous_x[-3] > ap.previous_x[-4] and ap.exit == False):
+                        print('byebye')
+                        data_to_save['person'][-1]['activity'] = 'Exit Shop'
+                        ap.exit = True
+                    elif( ap.previous_x[-1] < ap.previous_x[-2] and
+                          ap.previous_x[-2] < ap.previous_x[-3] and
+                          ap.previous_x[-3] < ap.previous_x[-4] and ap.enter == False ):
+                        print('enter to shop, welcome ')
+                        data_to_save['person'][-1]['activity'] = 'Enter Shop'
+                        ap.enter = True
+
+
 
 
 
@@ -544,7 +627,7 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
 
             #print(max_loc_h[1],max_loc_s[1],max_loc_v[1])
 
-            scalar_color = (max_loc_h[1]*12, max_loc_s[1]*32, max_loc_v[1]*32)
+            scalar_color = (max_loc_h[1]*12, max_loc_s[1]*32+40, max_loc_v[1]*32)
 
             crop_img_hsv[:] =(scalar_color)
             crop_img_hsv = cv2.cvtColor(crop_img_hsv, cv2.COLOR_HSV2BGR)
@@ -553,11 +636,11 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
             meanCurr = cv2.mean(crop_img_hsv)
 
             if(ap.meanColor == (999,999,999)):
-                ap.meanColor = cv2.mean(crop_img_hsv)
+                ap.meanColor = meanCurr
             else:
                 ap.meanColor = ((ap.meanColor[0]+meanCurr[0])/2,(ap.meanColor[1]+meanCurr[1])/2,(ap.meanColor[2]+meanCurr[2])/2)
                 scalar_color = ap.meanColor
-                #print(ap.name, meanCurr, ap.meanColor)
+                print(ap.name, meanCurr, ap.meanColor)
 
             #cv2.imshow("color", crop_img_hsv)
 
@@ -610,7 +693,7 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
             sorted_by_value = sorted(ap.colorterm.items(), key=lambda kv: kv[1])
             sorted_by_value.reverse()
 
-            #print(sorted_by_value)
+            print(ap.name, sorted_by_value)
             #print(max(ap.colorterm, key=ap.colorterm.get))
 
             finalTerm = max(ap.colorterm, key=ap.colorterm.get)
@@ -627,66 +710,20 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                         0.5, (255,255,255), 2, cv2.LINE_AA)
 
 
-
+        #save to file
+        if(len(data_to_save['person']) != 0):
+            with open('data.txt', 'a') as outfile:
+                json.dump(data_to_save, outfile)
         #cv2.rectangle(image, (120, 240), (250, 260), (0, 255, 0), 2)
-        
+
         #1 = top->bottom, 2 = bottom->top, 3 = left->right, 4 = right->left
         #direction = 0
+
+        
             
-        for ap in all_person:
-            if(len(ap.previous_x) >= 4 and ap.previous_x[-1] >= e_min_x and ap.previous_x[-1] <= e_max_x and
-                   ap.previous_y[-1] >= e_min_y and ap.previous_y[-1] <= e_max_y):
-                #print("(", str(ap.previous_x[-1]), ", ", ap.previous_y[-1], ")")
-                if(e_direction == 1):
-                    if( ap.previous_y[-1] < ap.previous_y[-2] and
-                        ap.previous_y[-2] < ap.previous_y[-3] and
-                        ap.previous_y[-3] < ap.previous_y[-4] and ap.exit == False):
-                        print('byebye')
-                        ap.exit = True
-                    elif( ap.previous_y[-1] > ap.previous_y[-2] and
-                          ap.previous_y[-2] > ap.previous_y[-3] and
-                          ap.previous_y[-3] > ap.previous_y[-4] and ap.enter == False ):
-                        print('enter to shop, welcome ')
-                        ap.enter = True
-                
-                elif(e_direction == 2):
-                    if( ap.previous_y[-1] > ap.previous_y[-2] and
-                        ap.previous_y[-2] > ap.previous_y[-3] and
-                        ap.previous_y[-3] > ap.previous_y[-4] and ap.exit == False):
-                        print('byebye')
-                        ap.exit = True
-                    elif( ap.previous_y[-1] < ap.previous_y[-2] and
-                          ap.previous_y[-2] < ap.previous_y[-3] and
-                          ap.previous_y[-3] < ap.previous_y[-4] and ap.enter == False ):
-                        print('enter to shop, welcome ')
-                        ap.enter = True
-                    
-                elif(e_direction == 3):
-                    if( ap.previous_x[-1] < ap.previous_x[-2] and
-                        ap.previous_x[-2] < ap.previous_x[-3] and
-                        ap.previous_x[-3] < ap.previous_x[-4] and ap.exit == False):
-                        print('byebye')
-                        ap.exit = True
-                    elif( ap.previous_x[-1] > ap.previous_x[-2] and
-                          ap.previous_x[-2] > ap.previous_x[-3] and
-                          ap.previous_x[-3] > ap.previous_x[-4] and ap.enter == False ):
-                        print('enter to shop, welcome ')
-                        ap.enter = True
-                    
-                elif(e_direction == 4):
-                    if( ap.previous_x[-1] > ap.previous_x[-2] and
-                        ap.previous_x[-2] > ap.previous_x[-3] and
-                        ap.previous_x[-3] > ap.previous_x[-4] and ap.exit == False):
-                        print('byebye')
-                        ap.exit = True
-                    elif( ap.previous_x[-1] < ap.previous_x[-2] and
-                          ap.previous_x[-2] < ap.previous_x[-3] and
-                          ap.previous_x[-3] < ap.previous_x[-4] and ap.enter == False ):
-                        print('enter to shop, welcome ')
-                        ap.enter = True
-                
-                
-                
+
+
+
 
         #cv2.line(image, (150, 280), (250, 280), (0,255,0), 2)
         templist = []
