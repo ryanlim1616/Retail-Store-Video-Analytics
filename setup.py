@@ -5,6 +5,7 @@ import json
 import time
 from picamera.array import PiRGBArray
 from picamera import PiCamera
+import os
 
 
 WINDOW_NAME	= 'GUI'
@@ -110,7 +111,7 @@ def mouse_click_entryexit():
         setEntryExit = 0
 
 
-#check if config file is empty, if not refill the zones.
+file = open('config.txt', 'a+')
 with open('config.txt', 'r') as cfgfile:
     cfgfile.seek(0) #start of file
     first_char = cfgfile.read(1) #get the first character
