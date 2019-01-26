@@ -1,4 +1,4 @@
-"# Retail-Store-Video-Analytics"
+# Retail-Store-Video-Analytics
 
 ## Docker setup:
 1. Create/Copy Dockerfile, insert the following:
