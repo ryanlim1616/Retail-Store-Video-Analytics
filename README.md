@@ -3,7 +3,7 @@
 ## Docker setup:
 1. Create/Copy Dockerfile, insert the following:
 
-`
+```
 FROM sgtwilko/rpi-raspbian-opencv
 RUN apt-get update && apt-get install git
 RUN pip3 install cvui
@@ -11,26 +11,26 @@ RUN apt-get install -qqy x11-apps
 ENV DISPLAY :0
 RUN git clone https://github.com/BrightTux/Retail-Store-Video-Analytics.git
 RUN sudo usermod -a -G video $(whoami)
-`
+```
 
 
 2. Build:
 
-`
+```
 sudo docker build -t myretail .
-`
+```
 
 3. Setup Parameters:
-`
+```
 XSOCK=/tmp/.X11-unix
 XAUTH=/tmp/.docker.xauth
 xauth nlist :0 | sed -e 's/^..../ffff/' | xauth -f $XAUTH nmerge -
-`
+```
 
 4. Run the docker container:
-`
+```
 sudo docker run -ti --device=/dev/vcsm --device=/dev/vchiq -v $XSOCK:$XSOCK -v $XAUTH:$XAUTH -e XAUTHORITY=$XAUTH myretail bash
-`
+```
 
 ## Usage Instructions:
 1. Run setup.py to setup the zones and entrance and exit locations.
