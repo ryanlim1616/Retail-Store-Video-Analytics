@@ -338,7 +338,7 @@ for i_frame in camera.capture_continuous(rawCapture, format="bgr", use_video_por
     key = cv2.waitKey(20)
 
     rawCapture.truncate(0)
-    if key == 27:
+    if key == ord("q"):
         break
     elif key != -1:
         new_stringLabel.append(chr(key))
