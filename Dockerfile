@@ -1,5 +1,5 @@
 FROM sgtwilko/rpi-raspbian-opencv
-RUN apt-get update && apt-get install git
+RUN apt-get update && apt-get install git vim ftp
 RUN pip3 install cvui
 RUN apt-get install -qqy x11-apps
 ENV DISPLAY :0
