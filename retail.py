@@ -6,10 +6,12 @@ from picamera.array import PiRGBArray
 from picamera import PiCamera
 import json
 import datetime
+import boto3
+import requests
 
 class Person:
 
-    def __init__(self, buffer, x, y, w, h):
+    def __init__(self, buffer, x, y, w, h, gender):
 
         self.name = 0
         self.previous_x = []
@@ -37,6 +39,9 @@ class Person:
 
         self.previous_x.append( x + (w / 2) )
         self.previous_y.append( y + (h / 2) )
+
+        #gender
+        self.gender = gender
 
         self.cal_next_pos()
 
@@ -146,6 +151,14 @@ def denoise(frame):
 def mousePosition(event, x, y, flags,param):
     if event == cv2.EVENT_LBUTTONDOWN:
         print("(", x, ", ", y, ")")
+
+def checkConnection():
+    try:
+        r = requests.get('http://google.com')
+        print(r.status_code)
+        return True
+    except ValueError:
+        return False
 
 camera = PiCamera()
 camera.resolution = (640, 480)
@@ -296,12 +309,27 @@ BGS = cv2.createBackgroundSubtractorMOG2(detectShadows=True)
 kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(dilation_size, dilation_size))
 closing_kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE,(closing_kernel, closing_kernel))
 
+#AWS
+
+gender_categories = ['female', 'male', 'unknown']
+
+internet_switch = checkConnection()
+if(internet_switch):
+    runtime = boto3.Session().client(service_name='runtime.sagemaker',
+                                    region_name='ap-southeast-1',
+                                    aws_access_key_id='',
+                                    aws_secret_access_key='')
+    print("AWS Done..")
+
+# to turn gender detection on or off
+internet_switch = False
+
+
 for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=True):
     image = frame.array
     if(first_time == True):
         first_time = False
         backSubtractor = BackGroundSubtractor(0.001,denoise(image))
-
 
 
     else:
@@ -379,7 +407,7 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
         #mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         #mask = cv2.dilate(mask, kernel, iterations = 1)
-        contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        img, contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         cv2.drawContours(mask, contours, -1, (0,255,0))
 
 
@@ -394,7 +422,7 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
 
                 if(w >= min_width and h >= min_height):
                     #cv2.rectangle(frame, (x,y), (x+w,y+h), (255, 0, 0), 2)
-                    p1 = Person(store_buffer, x, y, w, h)
+                    p1 = Person(store_buffer, x, y, w, h, 2)
 
                     templist.append(p1)
 
@@ -404,6 +432,24 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
             for p in templist:
                 p.set_name(count_num)
                 p.get_added = True
+
+                #gender detection
+                if(internet_switch):
+                    crop_img_for_gender = image[p.curr_y:p.curr_y + p.curr_h, p.curr_x:p.curr_x + p.curr_w]
+                    img_str = cv2.imencode('.jpg', crop_img_for_gender)[1].tostring()
+
+                    response = runtime.invoke_endpoint(EndpointName='DEMO-gender-classification',
+                                        ContentType='application/x-image',
+                                        Body=img_str)
+
+                    result = response['Body'].read()
+                    result = json.loads(result.decode('utf-8'))
+                    index = np.argmax(result)
+                    print("Result: label - " + gender_categories[index] + ", probability - " + str(result[index]))
+
+                    p.gender = index
+                #end of gender detection
+
                 all_person.append(p)
                 count_num = count_num + 1
 
@@ -438,6 +484,25 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                 aa.set_name(count_num)
                 aa.get_added = True
                 count_num = count_num + 1
+
+                #gender detection
+                if(internet_switch):
+                    crop_img_for_gender = image[aa.curr_y:aa.curr_y + aa.curr_h, aa.curr_x:aa.curr_x + aa.curr_w]
+                    img_str = cv2.imencode('.jpg', crop_img_for_gender)[1].tostring()
+
+                    response = runtime.invoke_endpoint(EndpointName='DEMO-gender-classification',
+                                        ContentType='application/x-image',
+                                        Body=img_str)
+
+                    result = response['Body'].read()
+                    result = json.loads(result.decode('utf-8'))
+                    index = np.argmax(result)
+                    print("Result: label - " + gender_categories[index] + ", probability - " + str(result[index]))
+
+                    aa.gender = index
+
+                #end of gender detection
+
                 all_person.append(aa)
                 #print("added new, not 00")
                 #print('add new: ', all_person[-1].name)
@@ -476,6 +541,7 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
                 'y': ap.curr_y,
                 'w': ap.curr_w,
                 'h': ap.curr_h,
+                'gender': ap.gender,
                 'activity': '',
                 'c_top':ap.highestColorTermTop,
                 'c_bot':ap.highestColorTermBot,
@@ -739,7 +805,9 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
 
             # ------ END OF COLORS -----------
 
-            putText = str(ap.name) + ", (" + str(ap.highestColorTermTop) + ", " + str(ap.highestColorTermBot) + ")"
+            #add in gender
+
+            putText = str(ap.name) + ", (" + str(ap.highestColorTermTop) + ", " + str(ap.highestColorTermBot) + "), " + str(gender_categories[ap.gender])
             cv2.rectangle(image, (ap.curr_x, ap.curr_y),
                           (ap.curr_x + ap.curr_w, ap.curr_y + ap.curr_h), (255, 0, 0), 2)
             cv2.putText(image, putText, (ap.curr_x, ap.curr_y), cv2.FONT_HERSHEY_SIMPLEX,
