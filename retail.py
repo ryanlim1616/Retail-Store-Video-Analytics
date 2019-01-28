@@ -407,7 +407,7 @@ for frame in camera.capture_continuous(rawCapture, format="bgr", use_video_port=
         #mask = cv2.morphologyEx(mask, cv2.MORPH_OPEN, kernel)
         mask = cv2.morphologyEx(mask, cv2.MORPH_CLOSE, kernel)
         #mask = cv2.dilate(mask, kernel, iterations = 1)
-        img, contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
+        contours, hierarchy = cv2.findContours(mask, cv2.RETR_TREE, cv2.CHAIN_APPROX_SIMPLE)
         cv2.drawContours(mask, contours, -1, (0,255,0))
 
 
