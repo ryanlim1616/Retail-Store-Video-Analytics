@@ -11,11 +11,9 @@
 
 # Obtain date from Rasp pi
 date=$(date +%Y%m%d_%H%M%S)
-echo $date
 
 # Feel free to change the naming convention
 filename="Backup/data_"$date".txt"
-echo $filename
 
 # Create backup
 cp data.txt $filename
