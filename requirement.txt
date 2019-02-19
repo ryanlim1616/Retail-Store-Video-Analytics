@@ -1,0 +1,5 @@
+opencv-python==3.4.4.19
+cvui==2.7
+imutils==0.5.1
+numpy==1.15.3
+picamera==1.13
